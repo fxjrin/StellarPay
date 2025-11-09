@@ -299,17 +299,24 @@ export const contractService = {
           } else if (key === 'sender' && val?._arm === 'address') {
             const addressValue = val._value;
             if (addressValue?._arm === 'accountId' && addressValue._value) {
-              const pkData = addressValue._value?._armType ? addressValue._value._value : addressValue._value;
+              const edValue = addressValue._value;
+              // Navigate through nested structure to get the actual bytes
+              const pkData = edValue._value || edValue;
               if (pkData?.data) {
                 payment.sender = StrKey.encodeEd25519PublicKey(Buffer.from(pkData.data));
+              } else if (Buffer.isBuffer(pkData)) {
+                payment.sender = StrKey.encodeEd25519PublicKey(pkData);
               }
             }
           } else if (key === 'token' && val?._arm === 'address') {
             const addressValue = val._value;
-            if (addressValue?._arm === 'contractId' && addressValue._value) {
-              const contractData = addressValue._value?.data || addressValue._value;
-              if (contractData) {
-                payment.token = StrKey.encodeContract(Buffer.from(contractData));
+            if (addressValue?._arm === 'contractId') {
+              const contractValue = addressValue._value;
+              // Get the actual bytes from nested structure
+              if (contractValue?.data) {
+                payment.token = StrKey.encodeContract(Buffer.from(contractValue.data));
+              } else if (Buffer.isBuffer(contractValue)) {
+                payment.token = StrKey.encodeContract(contractValue);
               }
             }
           } else if (key === 'amount' && val?._arm === 'i128') {
