@@ -266,12 +266,17 @@ export const contractService = {
     const contract = getContract();
 
     try {
+      console.log('[getUserPayments] Fetching payments for username:', username);
+
       // Get total count of payments for this user
       const countTx = await contract.get_payment_count({ username });
       const countResult = await countTx.simulate();
       const count = Number(countResult.result);
 
+      console.log('[getUserPayments] Payment count:', count);
+
       if (count === 0) {
+        console.log('[getUserPayments] No payments found');
         return [];
       }
 
@@ -282,15 +287,18 @@ export const contractService = {
           const idTx = await contract.get_payment_id_at({ username, index: BigInt(i) });
           const idResult = await idTx.simulate();
           if (idResult.result) {
+            console.log(`[getUserPayments] Payment ID at index ${i}:`, idResult.result.toString());
             paymentIds.push(idResult.result);
           }
         } catch (e) {
-          // Skip failed payment ID retrieval
+          console.error(`[getUserPayments] Error getting payment at index ${i}:`, e);
         }
       }
 
+      console.log('[getUserPayments] Total payment IDs retrieved:', paymentIds.length);
       return paymentIds;
     } catch (error) {
+      console.error('[getUserPayments] Error:', error);
       return [];
     }
   },

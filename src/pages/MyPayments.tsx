@@ -49,26 +49,33 @@ export const MyPayments: React.FC = () => {
   }, [profile]);
 
   const loadPayments = async () => {
-    if (!profile?.username) return;
+    if (!profile?.username) {
+      console.log('[MyPayments] No profile or username');
+      return;
+    }
 
+    console.log('[MyPayments] Loading payments for profile:', profile);
     setLoading(true);
     try {
-
       // Get payment IDs for this user from contract
       const paymentIds = await contractService.getUserPayments(profile.username);
+      console.log('[MyPayments] Retrieved payment IDs:', paymentIds);
 
       // Load each payment detail
       const paymentDetails = await Promise.all(
         paymentIds.map(async (id) => {
           const payment = await contractService.getPayment(id);
+          console.log('[MyPayments] Payment detail for ID', id.toString(), ':', payment);
           return payment;
         })
       );
 
       // Filter out nulls and set state
       const validPayments = paymentDetails.filter(p => p !== null) as Payment[];
+      console.log('[MyPayments] Valid payments:', validPayments);
       setPayments(validPayments);
     } catch (error) {
+      console.error('[MyPayments] Error loading payments:', error);
     } finally {
       setLoading(false);
     }
