@@ -261,8 +261,6 @@ export const contractService = {
       // Manually simulate
       const simulated = await assembled.simulate();
 
-      console.log('[getPayment] Raw simulation:', simulated.simulation);
-
       // Parse raw simulation response manually
       const simulation = simulated.simulation;
 
@@ -272,7 +270,6 @@ export const contractService = {
       }
 
       const retval = simulation.result.retval;
-      console.log('[getPayment] Retval:', retval);
 
       // Check if it's void (None)
       if (retval._arm === 'void' || !retval._value) {
@@ -280,17 +277,61 @@ export const contractService = {
         return null;
       }
 
-      // If it's a map (Some<Payment>), try to access simulated.result
-      // which should have auto-parsed the payment
-      try {
-        const result = simulated.result;
-        console.log('[getPayment] Parsed result:', result);
-        return result;
-      } catch (parseError) {
-        console.error('[getPayment] Auto-parse failed:', parseError);
-        // Fallback: return null if parsing fails
-        return null;
+      // Manually parse the map (Payment struct)
+      if (retval._arm === 'map' && Array.isArray(retval._value)) {
+        const map = retval._value;
+        const payment: any = {};
+
+        for (const entry of map) {
+          const keyObj = entry._attributes?.key;
+          const keyData = keyObj?._value?.data || keyObj?._value;
+
+          if (!keyData) continue;
+
+          const key = Buffer.from(keyData).toString();
+          const val = entry._attributes.val;
+
+          if (key === 'payment_id' && val?._arm === 'u64') {
+            payment.payment_id = BigInt(val._value?._value || val._value);
+          } else if (key === 'recipient_username' && val?._arm === 'str') {
+            const data = val._value?.data || val._value;
+            payment.recipient_username = Buffer.from(data).toString();
+          } else if (key === 'sender' && val?._arm === 'address') {
+            const addressValue = val._value;
+            if (addressValue?._arm === 'accountId' && addressValue._value) {
+              const pkData = addressValue._value?._armType ? addressValue._value._value : addressValue._value;
+              if (pkData?.data) {
+                payment.sender = StrKey.encodeEd25519PublicKey(Buffer.from(pkData.data));
+              }
+            }
+          } else if (key === 'token' && val?._arm === 'address') {
+            const addressValue = val._value;
+            if (addressValue?._arm === 'contractId' && addressValue._value) {
+              const contractData = addressValue._value?.data || addressValue._value;
+              if (contractData) {
+                payment.token = StrKey.encodeContract(Buffer.from(contractData));
+              }
+            }
+          } else if (key === 'amount' && val?._arm === 'i128') {
+            const amountData = val._value?._attributes;
+            const lo = amountData?.lo?._value || '0';
+            payment.amount = BigInt(lo);
+          } else if (key === 'message' && val?._arm === 'str') {
+            const data = val._value?.data || val._value;
+            payment.message = Buffer.from(data).toString();
+          } else if (key === 'timestamp' && val?._arm === 'u64') {
+            payment.timestamp = BigInt(val._value?._value || val._value);
+          } else if (key === 'claimed' && val?._arm === 'b') {
+            payment.claimed = val._value === true;
+          }
+        }
+
+        console.log('[getPayment] Manually parsed payment:', payment);
+        return payment;
       }
+
+      console.log('[getPayment] Unexpected retval format');
+      return null;
     } catch (error) {
       console.error('[getPayment] Error fetching payment', paymentId.toString(), ':', error);
       return null;
