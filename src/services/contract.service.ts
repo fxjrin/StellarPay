@@ -253,10 +253,14 @@ export const contractService = {
     const contract = getContract();
 
     try {
+      console.log('[getPayment] Fetching payment ID:', paymentId.toString());
       const tx = await contract.get_payment({ payment_id: paymentId });
       const simulated = await tx.simulate();
+      console.log('[getPayment] Raw simulation result:', simulated);
+      console.log('[getPayment] Result:', simulated.result);
       return simulated.result;
     } catch (error) {
+      console.error('[getPayment] Error fetching payment', paymentId.toString(), ':', error);
       return null;
     }
   },
