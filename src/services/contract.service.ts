@@ -254,11 +254,43 @@ export const contractService = {
 
     try {
       console.log('[getPayment] Fetching payment ID:', paymentId.toString());
-      const tx = await contract.get_payment({ payment_id: paymentId });
-      const simulated = await tx.simulate();
-      console.log('[getPayment] Raw simulation result:', simulated);
-      console.log('[getPayment] Result:', simulated.result);
-      return simulated.result;
+
+      // Build transaction without auto-simulation
+      const assembled = await contract.get_payment({ payment_id: paymentId }, { simulate: false });
+
+      // Manually simulate
+      const simulated = await assembled.simulate();
+
+      console.log('[getPayment] Raw simulation:', simulated.simulation);
+
+      // Parse raw simulation response manually
+      const simulation = simulated.simulation;
+
+      if (!simulation?.result?.retval) {
+        console.log('[getPayment] No retval in simulation');
+        return null;
+      }
+
+      const retval = simulation.result.retval;
+      console.log('[getPayment] Retval:', retval);
+
+      // Check if it's void (None)
+      if (retval._arm === 'void' || !retval._value) {
+        console.log('[getPayment] Payment not found (void)');
+        return null;
+      }
+
+      // If it's a map (Some<Payment>), try to access simulated.result
+      // which should have auto-parsed the payment
+      try {
+        const result = simulated.result;
+        console.log('[getPayment] Parsed result:', result);
+        return result;
+      } catch (parseError) {
+        console.error('[getPayment] Auto-parse failed:', parseError);
+        // Fallback: return null if parsing fails
+        return null;
+      }
     } catch (error) {
       console.error('[getPayment] Error fetching payment', paymentId.toString(), ':', error);
       return null;
